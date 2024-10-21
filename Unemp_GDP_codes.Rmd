@@ -1,0 +1,125 @@
+---
+title: "Untitled"
+author: "RMA"
+date: "2024-10-19"
+output: html_document
+---
+library(readxl)
+GDP <- read_excel("GDP.xlsx", col_types = c("text", "text", "numeric"))
+View(GDP)
+library(readxl)
+Unemp <- read_excel("Unemp.xlsx", col_types = c("text", "text", "numeric"))
+options(scipen=999) #disable scientific notation
+View(Unemp)
+View(GDP)
+
+Unemp_GDP<-merge(GDP, Unemp, by=c("Country","Year")) #merging the time series data sets into one panel data form
+
+library(plm) #package for panel data analysis
+
+pdata_Unemp_GDP <- pdata.frame(Unemp_GDP, index = c("Country","Year")) #Conversion to panel data frame
+
+colnames(pdata_Unemp_GDP)<-c("Country","Year","GDP","Unemp") #changed column names for simplicity
+
+summary(pdata_Unemp_GDP) #summarising the panel data frame. Min, max, mean, QR for GDP and Unemp given. Number of variables and observations summarised.
+
+ggplot(data=pdata_Unemp_GDP, aes(x=GDP,y=Unemp)) + geom_point() #to check if the variables are linear
+
+log_GDP<-log(pdata_Unemp_GDP$GDP) #log transformation of GDP
+log_Unemp<-log(pdata_Unemp_GDP$Unemp) #log transformation of Unemp
+
+regression_model<-lm(log_Unemp~log_GDP, data = pdata_Unemp_GDP) #regression
+summary(regression_model)
+
+Call:
+  lm(formula = log_Unemp ~ log_GDP, data = pdata_Unemp_GDP)
+
+Residuals:
+  Min       1Q   Median       3Q      Max 
+-0.89274 -0.35904  0.07017  0.37090  0.79298 
+
+Coefficients:
+  Estimate Std. Error t value Pr(>|t|)   
+(Intercept)  4.87690    1.62343   3.004  0.00349 **
+  log_GDP     -0.10736    0.05582  -1.923  0.05776 . 
+---
+  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.446 on 86 degrees of freedom
+Multiple R-squared:  0.04124,	Adjusted R-squared:  0.03009 
+F-statistic: 3.699 on 1 and 86 DF,  p-value: 0.05776
+
+#result of regression model: 1% increase in GDP leads to about 0.1% units fall in Unemployment
+
+fixed_model<-plm(log_Unemp ~ log_GDP, data=pdata_Unemp_GDP, model = "within") #Fit a FE model
+summary(fixed_model)
+
+Call:
+  plm(formula = log_Unemp ~ log_GDP, data = pdata_Unemp_GDP, model = "within")
+
+Balanced Panel: n = 8, T = 11, N = 88
+
+Residuals:
+  Min.    1st Qu.     Median    3rd Qu.       Max. 
+-0.3355290 -0.0727323 -0.0079863  0.0735631  0.5296196 
+
+Coefficients:
+  Estimate Std. Error t-value            Pr(>|t|)    
+log_GDP  -3.0693     0.3155 -9.7282 0.00000000000000371 ***
+  ---
+  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Total Sum of Squares:    3.2609
+Residual Sum of Squares: 1.4836
+R-Squared:      0.54503
+Adj. R-Squared: 0.49896
+F-statistic: 94.6385 on 1 and 79 DF, p-value: 0.0000000000000037104
+
+random_model<-plm(log_Unemp~log_GDP, data=pdata_Unemp_GDP, model= "random") #Fit a RE model
+summary(random_model)
+
+Call:
+  plm(formula = log_Unemp ~ log_GDP, data = pdata_Unemp_GDP, model = "random")
+
+Balanced Panel: n = 8, T = 11, N = 88
+
+Effects:
+  var std.dev share
+idiosyncratic 0.01878 0.13704 0.082
+individual    0.20981 0.45805 0.918
+theta: 0.9102
+
+Residuals:
+  Min.   1st Qu.    Median   3rd Qu.      Max. 
+-0.277780 -0.143190 -0.031037  0.107928  0.611114 
+
+Coefficients:
+  Estimate Std. Error z-value    Pr(>|z|)    
+(Intercept) 27.82039    6.27844  4.4311 0.000009375 ***
+  log_GDP     -0.89659    0.21585 -4.1538 0.000032695 ***
+  ---
+  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Total Sum of Squares:    3.3785
+Residual Sum of Squares: 2.814
+R-Squared:      0.16711
+Adj. R-Squared: 0.15742
+Chisq: 17.2544 on 1 DF, p-value: 0.000032695
+
+
+hausman_test <- pFtest(fixed_model, random_model) #check which model is the best
+print(hausman_test)
+
+F test for individual effects
+
+data:  log_Unemp ~ log_GDP
+F = 10.12, df1 = 7, df2 = 79, p-value = 0.000000005654
+alternative hypothesis: significant effects
+
+(Predictor is GDP.)
+
+#As the p<0.05, we reject the null hypothesis 
+#H0: The random effects model is appropriate (individual effects are uncorrelated with the predictors).
+#H1: The fixed effects model is appropriate (individual effects are correlated with the predictors).
+#Thus, FE model is more appropriate.
+#For every 1% increase in GDP, Unemployment decreases by 3.06%.
