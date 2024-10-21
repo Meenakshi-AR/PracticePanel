@@ -1,9 +1,3 @@
----
-title: "Untitled"
-author: "RMA"
-date: "2024-10-19"
-output: html_document
----
 library(readxl)
 GDP <- read_excel("GDP.xlsx", col_types = c("text", "text", "numeric"))
 View(GDP)
